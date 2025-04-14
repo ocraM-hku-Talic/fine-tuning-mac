@@ -1,0 +1,23 @@
+pip install mlx-lm
+python grab_data.py
+
+mlx_lm.generate --prompt "[chat content]" --model [huggingface model]
+
+testing model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+
+mlx_lm.lora --model "deepseek-ai/DeepSeek-R1-Distill-Llama-8B" --train --data "./jsonl-dataset" --iters 20
+
+after prep model:
+--fine-tune-type (default LoRA)
+--num-layers (default 16)
+--batch-size 
+--grad-checkpoint
+
+after tuning:
+From ./model
+ADAPTER ./adapters
+
+
+!Data format and data is very important
+!Spec matters
+!Try different combination
