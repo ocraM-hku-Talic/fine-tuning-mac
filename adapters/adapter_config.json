@@ -2,10 +2,10 @@
     "adapter_path": "adapters",
     "batch_size": 4,
     "config": null,
-    "data": "./jsonl-dataset",
+    "data": "./cleaned-dataset",
     "fine_tune_type": "lora",
     "grad_checkpoint": false,
-    "iters": 20,
+    "iters": 100,
     "learning_rate": 1e-05,
     "lora_parameters": {
         "rank": 8,

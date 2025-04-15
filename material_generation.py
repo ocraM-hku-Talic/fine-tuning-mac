@@ -312,14 +312,51 @@ def generate_qa_pairs_simple(content_items, topics, num_samples):
     
     return qa_pairs
 
-def generate_qa_pairs_with_ollama(content_items, num_samples, ollama_model, batch_size=5):
+def save_qa_pair_immediately(qa_pair, output_file, format_type="finetune"):
+    """Save a single Q&A pair immediately to avoid data loss."""
+    # Format the pair
+    if format_type == "alpaca":
+        formatted_data = {
+            "instruction": qa_pair["question"],
+            "input": "",  # No additional input
+            "output": qa_pair["answer"]
+        }
+    elif format_type == "sharegpt":
+        conversation = [
+            {"from": "human", "value": qa_pair["question"]},
+            {"from": "gpt", "value": qa_pair["answer"]}
+        ]
+        formatted_data = {"conversations": conversation}
+    else:  # "finetune" format for prompt/completion
+        formatted_data = {
+            "prompt": qa_pair["question"],
+            "completion": qa_pair["answer"]
+        }
+    
+    # Append to the output file
+    with jsonlines.open(output_file, mode='a') as writer:
+        writer.write(formatted_data)
+
+    return True
+
+def generate_qa_pairs_with_ollama(content_items, num_samples, ollama_model, batch_size=5, truly_random=False, 
+                                 incremental_save=False, output_file=None, format_type="finetune", start_from=0):
     """Generate Q&A pairs using Ollama model."""
     qa_pairs = []
     processed_count = 0
+    saved_count = 0
     retry_limit = 3
     
     print(f"Generating {num_samples} Q&A pairs using Ollama model '{ollama_model}'...")
     print(f"Using batch size of {batch_size}")
+    
+    if incremental_save and output_file:
+        print(f"Incremental saving enabled. Results will be saved to {output_file}")
+        
+        # Create/clear the file if we're starting from the beginning
+        if start_from == 0:
+            with open(output_file, 'w') as f:
+                pass  # Create empty file or clear if exists
     
     # Check if Ollama is running
     try:
@@ -415,6 +452,8 @@ Important:
 """
         
         # Try to get a response from Ollama
+        batch_qa_pairs = []  # Store pairs from this batch
+        
         for retry in range(retry_limit):
             try:
                 response = requests.post(
@@ -442,12 +481,11 @@ Important:
                     if matches:
                         success = True
                         for _, question, answer in matches:
-                            qa_pairs.append({
+                            batch_qa_pairs.append({
                                 "question": question.strip(),
                                 "answer": answer.strip(),
                                 "source": source
                             })
-                            processed_count += 1
                     
                     # Approach 2: Try alternative formats if model didn't follow instructions exactly
                     if not success:
@@ -465,12 +503,11 @@ Important:
                             if matches:
                                 success = True
                                 for _, question, answer in matches:
-                                    qa_pairs.append({
+                                    batch_qa_pairs.append({
                                         "question": question.strip(),
                                         "answer": answer.strip(),
                                         "source": source
                                     })
-                                    processed_count += 1
                                 break
                     
                     # Approach 3: Extract any paragraphs that look like questions and answers
@@ -486,16 +523,15 @@ Important:
                             if para.endswith('?') or any(para.lower().startswith(q) for q in ['what', 'why', 'how', 'when', 'where', 'who', 'can', 'could']):
                                 # Save previous Q&A pair if any
                                 if current_q is not None and len(paragraphs) > 1:
-                                    qa_pairs.append({
+                                    batch_qa_pairs.append({
                                         "question": current_q,
                                         "answer": paragraphs[paragraphs.index(current_q) + 1] if paragraphs.index(current_q) < len(paragraphs) - 1 else "",
                                         "source": source
                                     })
-                                    processed_count += 1
                                     
                                 current_q = para
                             
-                        if processed_count > 0:
+                        if batch_qa_pairs:
                             success = True
                     
                     # Last resort - try to find any text with a question mark as a potential question
@@ -507,16 +543,28 @@ Important:
                             if '?' in line and i < len(lines) - 1:
                                 answer_text = lines[i+1]
                                 if len(answer_text) > 20:  # Only use if answer has reasonable length
-                                    qa_pairs.append({
+                                    batch_qa_pairs.append({
                                         "question": line.strip(),
                                         "answer": answer_text.strip(),
                                         "source": source
                                     })
-                                    processed_count += 1
                 
-                    print(f"Extracted {processed_count - (len(qa_pairs) - processed_count)} Q&A pairs from this batch")
+                    print(f"Extracted {len(batch_qa_pairs)} Q&A pairs from this batch")
+                    
+                    # The key change is here - immediately save each pair as it's created
+                    if incremental_save and output_file:
+                        successful_saves = 0
+                        for pair in batch_qa_pairs:
+                            save_success = save_qa_pair_immediately(pair, output_file, format_type)
+                            if save_success:
+                                successful_saves += 1
+                                saved_count += 1
+                        if successful_saves > 0:
+                            print(f"Saved {successful_saves} new pairs immediately, total saved: {saved_count}")
+                                
                     # If we successfully got any pairs, break retry loop
-                    break
+                    if batch_qa_pairs:
+                        break
                     
                 elif response.status_code == 404:
                     print(f"Error: Model '{ollama_model}' not found. Available models: {models_list}")
@@ -535,6 +583,10 @@ Important:
                 
                 if retry == retry_limit - 1:
                     print(f"Failed to process batch after {retry_limit} retries")
+        
+        # Add the new pairs to our collection
+        qa_pairs.extend(batch_qa_pairs)
+        processed_count += len(batch_items)
         
         print(f"Generated {len(qa_pairs)} Q&A pairs so far...")
         
@@ -679,7 +731,10 @@ def main():
             all_content, 
             args.num_samples, 
             args.ollama_model,
-            args.batch_size
+            args.batch_size,
+            incremental_save=True,
+            output_file=args.output,
+            format_type=args.format
         )
     else:
         # Fall back to template-based generation if not using Ollama

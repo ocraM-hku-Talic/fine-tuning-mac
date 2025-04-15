@@ -5,7 +5,10 @@ mlx_lm.generate --prompt "[chat content]" --model [huggingface model]
 
 testing model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
 
-mlx_lm.lora --model "deepseek-ai/DeepSeek-R1-Distill-Llama-8B" --train --data "./jsonl-dataset" --iters 20
+
+python material_generation.py --slides_dir "course_materials" --use_ollama --ollama_model "deepseek-r1:latest" --num_samples 500
+python clean_qa_data.py
+mlx_lm.lora --model "deepseek-ai/DeepSeek-R1-Distill-Llama-8B" --train --data "./cleaned-dataset" --iters 20
 
 after prep model:
 --fine-tune-type (default LoRA)
