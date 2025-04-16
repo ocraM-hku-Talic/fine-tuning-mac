@@ -5,7 +5,7 @@ import json
 import os
 from mlx_lm import generate, load
 
-def generate_with_mlx(prompt, max_tokens=100, temp=0.7):
+def generate_with_mlx(prompt, max_tokens=10000, temp=0.5):
     """Generate text using the MLX fine-tuned model"""
     print("=== MLX Fine-tuned Model ===")
     model_path = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
@@ -34,19 +34,12 @@ def generate_with_mlx(prompt, max_tokens=100, temp=0.7):
         print(f"Error with MLX generation: {e}")
         return None
 
-def generate_with_ollama(prompt, model_name="deepseek-r1:8b", max_tokens=100, temp=0.7):
+def generate_with_ollama(prompt, model_name="deepseek-r1:8b", max_tokens=10000, temp=0.5):
     """Generate text using Ollama"""
     print(f"\n=== Ollama Model ({model_name}) ===")
     try:
-        cmd = [
-            "ollama", "run", model_name, 
-            "--format", "json",
-            "--options", json.dumps({
-                "num_predict": max_tokens,
-                "temperature": temp
-            }),
-            prompt
-        ]
+        # Simpler command that works with older Ollama versions
+        cmd = ["ollama", "run", model_name, prompt]
         
         print(f"Running Ollama with model: {model_name}")
         print(f"Prompt: {prompt}")
@@ -57,17 +50,8 @@ def generate_with_ollama(prompt, model_name="deepseek-r1:8b", max_tokens=100, te
             print(f"Error running Ollama: {result.stderr}")
             return None
         
-        # Parse the output - Ollama may output multiple JSON objects
-        full_response = ""
-        for line in result.stdout.strip().split("\n"):
-            if not line:
-                continue
-            try:
-                data = json.loads(line)
-                if "response" in data:
-                    full_response += data["response"]
-            except json.JSONDecodeError:
-                full_response += line
+        # Just use the raw output from Ollama
+        full_response = result.stdout
         
         print("\nOllama Response:")
         print(full_response)

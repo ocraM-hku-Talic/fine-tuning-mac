@@ -16,7 +16,7 @@
     "mask_prompt": false,
     "max_seq_length": 2048,
     "model": "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
-    "num_layers": 16,
+    "num_layers": 32,
     "optimizer": "adam",
     "optimizer_config": {
         "adam": {},
