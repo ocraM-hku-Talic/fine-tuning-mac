@@ -27,5 +27,6 @@ after prep model:
 --grad-checkpoint
 
 after tuning:
-From ./model
-ADAPTER ./adapters
+echo 'FROM ./model
+ADAPTER ./adapters' > Modelfile
+ollama create tuned-deepseek-r1 -f Modelfile

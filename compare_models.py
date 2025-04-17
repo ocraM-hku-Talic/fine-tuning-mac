@@ -16,20 +16,38 @@ def generate_with_mlx(prompt, max_tokens=10000, temp=0.5):
     try:
         model, tokenizer = load(model_path, adapter_path=adapter_path)
         
-        print(f"Generating response for prompt: {prompt}")
-        
-        # Remove temperature parameter as it's not supported
-        response = generate(
-            model,
-            tokenizer,
-            prompt=prompt,
-            max_tokens=max_tokens
-            # temperature parameter removed
+        # Format the prompt to explicitly request a complete answer
+        formatted_prompt = "Provide direct, professional responses without including your thinking process. Give clear, accurate answers as if you were a subject matter expert. Include case examples and references where applicable."
+        messages = [
+            {"role": "system", "content": formatted_prompt},
+            {"role": "user", "content": prompt},
+        ]
+        print(f"Using formatted prompt: {formatted_prompt}")
+
+        text = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
         )
+
+        response = generate(model, tokenizer, prompt=text, max_tokens=max_tokens)
         
-        print("\nMLX Fine-tuned Response:")
+        print("\nOriginal MLX Fine-tuned Response:")
         print(response)
-        return response
+        
+        # Process the response
+        full_response = response.strip()
+        
+        # print("\nMLX Fine-tuned Response:")
+        # print(full_response)
+        
+        # Check if response appears to be cut off
+        if full_response.endswith((".", "!", "?")):
+            print("\nResponse appears to be complete.")
+        else:
+            print("\nNote: Response may be incomplete.")
+            
+        return full_response
     except Exception as e:
         print(f"Error with MLX generation: {e}")
         return None
